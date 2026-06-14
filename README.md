@@ -37,6 +37,29 @@ bun run dev
 ```
 Then open `http://localhost:3000` in your web browser.
 
+## Cloudflare Deployment
+This project is configured to deploy to Cloudflare using **Wrangler**.
+
+### Local CLI Deployment
+You can build and deploy directly from your terminal:
+1. Authenticate with Cloudflare (one-time setup):
+   ```bash
+   bunx wrangler login
+   ```
+2. Build and deploy:
+   ```bash
+   bun run deploy
+   ```
+This automatically compiles your assets into the `dist/` directory and uploads them.
+
+### Continuous Deployment (Git Integration)
+If you connect your GitHub repository directly to Cloudflare Pages/Workers for automatic deployments, configure the build settings in the Cloudflare dashboard as follows:
+* **Build command**: `bun install && bun run build`
+* **Build output directory**: `dist`
+* **Environment variables**:
+  * `BUN_VERSION` = `latest`
+  * `SKIP_DEPENDENCY_INSTALL` = `true` (forces Cloudflare to use Bun to resolve dependencies)
+
 ## Project Structure
 - `public/index.html`: The main user interface structure.
 - `public/style.css`: The styling rules defining the midcentury/Shaker aesthetic.

@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tinkerboxsynth",
+  "compatibility_date": "2026-06-14",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "dist"
+  },
+  "build": {
+    "command": "bun run build"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
