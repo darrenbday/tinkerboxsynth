@@ -475,18 +475,51 @@ function updateEnvelopeVisualizer() {
   const sustain = parseFloat((document.getElementById("env-sustain") as HTMLInputElement).value);
   const release = parseFloat((document.getElementById("env-release") as HTMLInputElement).value);
 
-  const aX = 10 + (attack / 2.0) * 40;
-  const dX = aX + (decay / 2.0) * 40;
-  const sY = 100 - (sustain / 100.0) * 80;
-  const sX = dX + 50;
-  const rX = sX + (release / 3.0) * 50;
+  const container = document.querySelector(".env-visualizer-container");
+  if (!container) return;
 
-  const pathD = `M 0 100 L ${aX} 20 L ${dX} ${sY} L ${sX} ${sY} L ${rX} 100`;
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+  
+  const svg = document.getElementById("env-svg");
+  if (svg) {
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  }
+
+  const startX = 10;
+  const endX = width - 10;
+  const baselineY = height - 10;
+  const peakY = 10;
+  
+  const availableWidth = endX - startX;
+
+  // Distribute percentages of the actual available width:
+  // Attack: 10% base + up to 15% (Range: 10% to 25%)
+  // Decay: 10% base + up to 15% (Range: 10% to 25%)
+  // Sustain: 25% (fixed)
+  // Release: 10% base + up to 15% (Range: 10% to 25%)
+  const attackWidth = (0.10 + (attack / 2.0) * 0.15) * availableWidth;
+  const decayWidth = (0.10 + (decay / 2.0) * 0.15) * availableWidth;
+  const sustainWidth = 0.25 * availableWidth;
+  const releaseWidth = (0.10 + (release / 3.0) * 0.15) * availableWidth;
+
+  const aX = startX + attackWidth;
+  const dX = aX + decayWidth;
+  const sX = dX + sustainWidth;
+  const rX = sX + releaseWidth;
+
+  const sY = baselineY - (sustain / 100.0) * (baselineY - peakY);
+
+  const pathD = `M 0 ${baselineY} L ${startX} ${baselineY} L ${aX} ${peakY} L ${dX} ${sY} L ${sX} ${sY} L ${rX} ${baselineY} L ${width} ${baselineY}`;
 
   document.getElementById("env-path")!.setAttribute("d", pathD);
+  
   document.getElementById("dot-attack")!.setAttribute("cx", aX.toString());
+  document.getElementById("dot-attack")!.setAttribute("cy", peakY.toString());
+  
   document.getElementById("dot-decay")!.setAttribute("cx", dX.toString());
   document.getElementById("dot-decay")!.setAttribute("cy", sY.toString());
+  
   document.getElementById("dot-sustain")!.setAttribute("cx", sX.toString());
   document.getElementById("dot-sustain")!.setAttribute("cy", sY.toString());
 }
@@ -929,4 +962,5 @@ window.addEventListener("load", () => {
   bindEvents();
   updateEnvelopeVisualizer();
   loadPreset("default");
+  window.addEventListener("resize", updateEnvelopeVisualizer);
 });

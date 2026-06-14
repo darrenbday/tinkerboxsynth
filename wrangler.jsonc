@@ -8,6 +8,9 @@
   "assets": {
     "directory": "dist"
   },
+  "build": {
+    "command": "bun run build"
+  },
   "compatibility_flags": [
     "nodejs_compat"
   ]
