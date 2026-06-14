@@ -48,4 +48,5 @@ lerna-debug.log*
 .devenv/
 .devbox/
 .direnv/
+.envrc
 devenv.local.nix
