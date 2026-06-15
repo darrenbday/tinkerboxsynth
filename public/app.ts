@@ -92,6 +92,33 @@ const presets: Record<string, SynthState> = {
     env: { attack: 0.1, decay: 0.3, sustain: 70, release: 0.5 },
     fx: { drive: 0, delayTime: 0.3, delayFeedback: 30, delayMix: 20, reverbSize: 2.5, reverbMix: 15 }
   },
+  "synth-piano": {
+    oscA: { wave: "triangle", octave: 0, detune: 0 },
+    oscB: { wave: "sine", octave: 1, detune: 8 },
+    mix: 65,
+    filter: { type: "lowpass", cutoff: 1500, q: 1.0 },
+    lfo: { dest: "none", rate: 1.0, depth: 0 },
+    env: { attack: 0.01, decay: 0.8, sustain: 5, release: 1.2 },
+    fx: { drive: 0, delayTime: 0.35, delayFeedback: 20, delayMix: 15, reverbSize: 3.5, reverbMix: 25 }
+  },
+  "synth-guitar": {
+    oscA: { wave: "triangle", octave: 0, detune: 0 },
+    oscB: { wave: "sawtooth", octave: 1, detune: 12 },
+    mix: 70,
+    filter: { type: "lowpass", cutoff: 900, q: 2.2 },
+    lfo: { dest: "none", rate: 1.0, depth: 0 },
+    env: { attack: 0.01, decay: 0.6, sustain: 0, release: 1.5 },
+    fx: { drive: 5, delayTime: 0.3, delayFeedback: 15, delayMix: 10, reverbSize: 2.8, reverbMix: 20 }
+  },
+  "zombie-groan": {
+    oscA: { wave: "sawtooth", octave: -2, detune: -10 },
+    oscB: { wave: "square", octave: -1, detune: 10 },
+    mix: 50,
+    filter: { type: "lowpass", cutoff: 500, q: 5.5 },
+    lfo: { dest: "cutoff", rate: 8.5, depth: 40 },
+    env: { attack: 0.4, decay: 0.5, sustain: 80, release: 0.8 },
+    fx: { drive: 35, delayTime: 0.25, delayFeedback: 15, delayMix: 15, reverbSize: 4.2, reverbMix: 35 }
+  },
   "cosmic-lead": {
     oscA: { wave: "sawtooth", octave: 0, detune: 0 },
     oscB: { wave: "triangle", octave: 1, detune: 15 },
@@ -148,9 +175,10 @@ let oscGainB: Tone.Gain;
 let mainFilter: Tone.Filter;
 let distortion: Tone.Distortion;
 let feedbackDelay: Tone.FeedbackDelay;
-let reverb: Tone.Reverb;
+let reverb: Tone.Freeverb;
 let vibrato: Tone.Vibrato;
 let lfo: Tone.LFO;
+let lfoFilterGain: Tone.Gain;
 let analyser: Tone.Analyser;
 let sequence: Tone.Sequence | null = null;
 
@@ -182,13 +210,14 @@ async function initAudio() {
   feedbackDelay = new Tone.FeedbackDelay(synthState.fx.delayTime, synthState.fx.delayFeedback / 100);
   feedbackDelay.wet.value = synthState.fx.delayMix / 100;
 
-  reverb = new Tone.Reverb({
-    decay: synthState.fx.reverbSize,
+  reverb = new Tone.Freeverb({
+    roomSize: synthState.fx.reverbSize / 5.0,
     wet: synthState.fx.reverbMix / 100
   });
 
   // LFO Modulator
-  lfo = new Tone.LFO(synthState.lfo.rate, 0, 1).start();
+  lfo = new Tone.LFO(synthState.lfo.rate, -1, 1).start();
+  lfoFilterGain = new Tone.Gain(0);
   vibrato = new Tone.Vibrato(synthState.lfo.rate, synthState.lfo.depth / 100.0);
   vibrato.wet.value = 0;
 
@@ -203,6 +232,9 @@ async function initAudio() {
   oscGainB.connect(vibrato);
   vibrato.connect(mainFilter);
 
+  lfo.connect(lfoFilterGain);
+  lfoFilterGain.connect(mainFilter.frequency);
+
   // Chain effects in series
   mainFilter.chain(distortion, feedbackDelay, reverb, Tone.Destination);
   
@@ -216,11 +248,14 @@ async function initAudio() {
   console.log("Tone.js synth initialized.");
 }
 
-// Set up parameter changes on Tone.js nodes
 function applyParameters() {
   if (!isAudioStarted) return;
 
-  // 1. Oscillators Waveforms
+  // 1. Reset modulations by setting gains/wet to 0 instead of disconnecting nodes
+  if (lfoFilterGain) lfoFilterGain.gain.value = 0;
+  if (vibrato) vibrato.wet.value = 0;
+
+  // 2. Oscillators Waveforms
   synthA.set({
     oscillator: { type: synthState.oscA.wave },
     detune: synthState.oscA.detune
@@ -230,12 +265,12 @@ function applyParameters() {
     detune: synthState.oscB.detune
   });
 
-  // 2. Mix gains
+  // 3. Mix gains
   const mixB = synthState.mix / 100.0;
   oscGainA.gain.value = 1.0 - mixB;
   oscGainB.gain.value = mixB;
 
-  // 3. Envelope values
+  // 4. Envelope values
   const sustainVal = synthState.env.sustain / 100.0;
   const envConfig = {
     envelope: {
@@ -248,32 +283,30 @@ function applyParameters() {
   synthA.set(envConfig);
   synthB.set(envConfig);
 
-  // 4. Filter
+  // 5. Filter
   mainFilter.type = synthState.filter.type;
   mainFilter.frequency.value = synthState.filter.cutoff;
   mainFilter.Q.value = synthState.filter.q;
 
-  // 5. Effects
+  // 6. Effects
   distortion.distortion = synthState.fx.drive / 100.0;
   
   feedbackDelay.delayTime.value = synthState.fx.delayTime;
   feedbackDelay.feedback.value = synthState.fx.delayFeedback / 100.0;
   feedbackDelay.wet.value = synthState.fx.delayMix / 100.0;
 
-  reverb.decay = synthState.fx.reverbSize;
+  reverb.roomSize.value = synthState.fx.reverbSize / 5.0;
   reverb.wet.value = synthState.fx.reverbMix / 100.0;
 
-  // 6. LFO modulation target reconnecting
-  lfo.disconnect();
+  // 7. LFO modulation target re-applying
   lfo.frequency.value = synthState.lfo.rate;
-  if (vibrato) vibrato.wet.value = 0; // Reset vibrato
 
   if (synthState.lfo.dest === "cutoff") {
-    // Sweep cutoff freq: baseCutoff +/- depth percent of 3000Hz
+    // Sweep cutoff freq: baseCutoff +/- depth percent of 2500Hz
     const sweepDepth = (synthState.lfo.depth / 100.0) * 2500;
-    lfo.min = Math.max(50, synthState.filter.cutoff - sweepDepth);
-    lfo.max = Math.min(18000, synthState.filter.cutoff + sweepDepth);
-    lfo.connect(mainFilter.frequency);
+    lfo.min = -sweepDepth;
+    lfo.max = sweepDepth;
+    lfoFilterGain.gain.value = 1;
   } else if (synthState.lfo.dest === "pitch" && vibrato) {
     // Modulate synth tuning using vibrato
     vibrato.frequency.value = synthState.lfo.rate;
@@ -528,6 +561,12 @@ function updateEnvelopeVisualizer() {
 function loadPreset(name: string) {
   const preset = presets[name];
   if (!preset) return;
+
+  // Release all active voices to prevent stuck notes when swapping presets
+  if (isAudioStarted) {
+    synthA.releaseAll();
+    synthB.releaseAll();
+  }
 
   Object.assign(synthState, JSON.parse(JSON.stringify(preset)));
 
